@@ -1,76 +1,68 @@
-#include <SoftwareSerial.h>
-#include <avr/pgmspace.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
 
-#define HOST_SERIAL_BAUDRATE 115200
+#define BAUD_RATE 115200
+#define SSID "IOT"
+#define PASS "REDACTED"
 
-#define ESP_SERIAL_BAUDRATE 9600
-#define ESP_SERIAL_PIN_RX 6
-#define ESP_SERIAL_PIN_TX 7
-#define ESP_SERIAL_BUFFER_SIZE 1024
+#define RED_DELAY 30000
+#define ORANGE_DELAY 20000
+#define GREEN_DELAY 30000
 
-#define WIFI_SSID "DION WiFi"
-#define WIFI_PASSWORD "DION2000"
-
-#define API_HOST "api.thingspeak.com"
-#define API_PORT "80"
-#define API_KEY_WRITE "ZMD45I01TSDZ8B11"
-#define API_KEY_READ "OAEJ9C8HZ1GKIU8L"
-#define API_FIELD "field1"
-
-SoftwareSerial espSerial(ESP_SERIAL_PIN_RX, ESP_SERIAL_PIN_TX);
-String rxBuffer;
-
-void esp_cmd(const String& cmd, const uint16_t timeout) {
-  uint32_t timer;
-
-  Serial.print(F(">>> "));
-  Serial.println(cmd);
-
-  espSerial.println(cmd);
-
-  rxBuffer = "";
-  timer = millis();
-  while (timer + timeout > millis()) {
-    while (espSerial.available()) {
-      rxBuffer += (char) espSerial.read();
-    }
-  }
-
-  Serial.print("<<< ");
-  Serial.println(rxBuffer);
-}
-
-void esp_send(int value) {
-  String message = "GET /update?api_key=" API_KEY_WRITE "&" API_FIELD "=" + String(value) + "\r\n\r\n";
-
-  esp_cmd("AT+CIPMUX=1", 1000);
-  esp_cmd("AT+CIPSTART=0,\"TCP\",\"" API_HOST "\"," API_PORT, 1000);
-  esp_cmd("AT+CIPSEND=0," + String(message.length()), 1000);
-
-  espSerial.find(">");
-  espSerial.println(message);
-
-  esp_cmd("AT+CIPCLOSE=0", 1000);
-}
+//Your Domain name with URL path or IP address with path
+String serverName = "http://api.thingspeak.com/update?api_key=ZMD45I01TSDZ8B11";
 
 void setup() {
-  Serial.begin(HOST_SERIAL_BAUDRATE);
-  espSerial.begin(ESP_SERIAL_BAUDRATE);
+  Serial.begin(BAUD_RATE);
 
-  esp_cmd("AT+RST", 1000);
-  esp_cmd("AT+CWMODE=1", 1000);
-#ifdef WIFI_PASSWORD
-  esp_cmd("AT+CWJAP=\"" WIFI_SSID "\",\"" WIFI_PASSWORD "\"", 1000);
-#else
-  esp_cmd("AT+CWJAP=\"" WIFI_SSID "\",", 1000);
-#endif
-  while (!espSerial.find("WIFI GOT IP")) {
+  WiFi.begin(SSID, PASS);
+  Serial.println("Connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
     Serial.print(".");
-    delay(1000);
   }
+  Serial.println("");
+  Serial.print("Connected to WiFi network with IP Address: ");
+  Serial.println(WiFi.localIP());
 }
 
 void loop() {
-  esp_send(random(1000));
-  delay(10000);
+  sendInt(0,RED_DELAY);
+  sendInt(2,GREEN_DELAY); 
+  sendInt(1,ORANGE_DELAY);
+}
+
+void sendInt(int a, long d) {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClient client;
+    HTTPClient http;
+
+    Serial.print("Sending:");
+    Serial.println(a);
+
+    String serverPath = serverName + "&field1=" + a;
+
+    // Your Domain name with URL path or IP address with path
+    http.begin(client, serverPath.c_str());
+
+    // Send HTTP GET request
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode > 0) {
+      Serial.print("HTTP Response code: ");
+      Serial.println(httpResponseCode);
+      String payload = http.getString();
+      Serial.println(payload);
+    }
+    else {
+      Serial.print("Error code: ");
+      Serial.println(httpResponseCode);
+    }
+    // Free resources
+    http.end();
+    delay(d);
+  }
+  else {
+    Serial.println("WiFi Disconnected");
+  }
 }
