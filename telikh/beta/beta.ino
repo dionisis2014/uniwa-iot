@@ -29,7 +29,8 @@ void setup() {
 }
 
 void loop() {
-  sendInt(0, RED_DELAY, api_remote, 8); //sendInt(0, RED_DELAY, api_mine, 8); 
+  sendInt(0, RED_DELAY, api_remote, 8);
+  sendInt(0, RED_DELAY, api_mine, 8); 
   sendInt(0, RED_DELAY, api_mine, 1);
   sendInt(2, GREEN_DELAY, api_mine, 1);
   sendInt(1, ORANGE_DELAY, api_mine, 1);
